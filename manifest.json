@@ -1,6 +1,6 @@
 {
-  "name": "MJ Music",
-  "short_name": "MJ Music",
+  "name": "Glass FLAC Player",
+  "short_name": "GlassPlayer",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
