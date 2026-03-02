@@ -147,13 +147,24 @@ export const Player: React.FC<PlayerProps> = ({
               const dominantColor = track.dominantColors?.[0] || 'rgba(255,255,255,0.4)';
               
               return (
-                <p 
-                  key={index} 
+                <motion.p
+                  key={index}
                   className={`text-lg transition-all duration-500 will-change-transform ${isActive ? 'text-white font-bold scale-110' : isPast ? 'text-white/60' : 'text-white/30'} ${!hasTimestamps ? 'opacity-100 scale-100 font-normal' : ''}`}
                   style={isActive && hasTimestamps ? { textShadow: `0 0 12px ${dominantColor}` } : {}}
+                  animate={isActive && hasTimestamps ? {
+                    textShadow: [
+                      `0 0 10px ${dominantColor}`,
+                      `0 0 22px ${dominantColor}`,
+                      `0 0 12px ${dominantColor}`
+                    ],
+                    scale: [1.08, 1.14, 1.1]
+                  } : { textShadow: 'none', scale: 1 }}
+                  transition={isActive && hasTimestamps
+                    ? { duration: 1, repeat: Infinity, ease: 'easeInOut' }
+                    : { duration: 0.25 }}
                 >
                   {line.text}
-                </p>
+                </motion.p>
               );
             })
           ) : (
