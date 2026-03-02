@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Track } from '../types';
+import { Track, LyricLine } from '../types';
 import { Play, Pause, SkipBack, SkipForward, Music, ChevronDown, Settings, ArrowLeft, FastForward, Repeat, Shuffle } from 'lucide-react';
 import { motion, useAnimation } from 'framer-motion';
 import { useSettings } from '../contexts/SettingsContext';
@@ -15,6 +15,7 @@ interface PlayerProps {
   onPrevious: () => void;
   onSeek: (percentage: number) => void;
   onBack: () => void;
+  parsedLyrics: LyricLine[];
 }
 
 const formatTime = (seconds: number) => {
@@ -23,11 +24,6 @@ const formatTime = (seconds: number) => {
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
-
-interface LyricLine {
-  time: number;
-  text: string;
-}
 
 export const Player: React.FC<PlayerProps> = ({
   track,
@@ -39,10 +35,10 @@ export const Player: React.FC<PlayerProps> = ({
   onNext,
   onPrevious,
   onSeek,
-  onBack
+  onBack,
+  parsedLyrics
 }) => {
   const [showLyrics, setShowLyrics] = useState(false);
-  const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
   const albumControls = useAnimation();
@@ -59,34 +55,6 @@ export const Player: React.FC<PlayerProps> = ({
       return () => clearInterval(interval);
     }
   }, [isPlaying, settings.beatPulseEnabled, albumControls]);
-
-  useEffect(() => {
-    if (track?.lyrics) {
-      const lines = track.lyrics.split('\n');
-      const parsed: LyricLine[] = [];
-      const timeRegEx = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
-      
-      lines.forEach(line => {
-        const match = timeRegEx.exec(line);
-        if (match) {
-          const min = parseInt(match[1]);
-          const sec = parseInt(match[2]);
-          const ms = parseInt(match[3]);
-          const time = min * 60 + sec + ms / (match[3].length === 2 ? 100 : 1000);
-          const text = line.replace(timeRegEx, '').trim();
-          if (text) {
-            parsed.push({ time, text });
-          }
-        } else if (line.trim() && !line.startsWith('[')) {
-          parsed.push({ time: -1, text: line.trim() });
-        }
-      });
-      
-      setParsedLyrics(parsed);
-    } else {
-      setParsedLyrics([]);
-    }
-  }, [track?.lyrics]);
 
   useEffect(() => {
     if (showLyrics && lyricsContainerRef.current && parsedLyrics.length > 0) {
@@ -199,32 +167,13 @@ export const Player: React.FC<PlayerProps> = ({
                   className="hidden" 
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
+                    if (file && track) {
                       const reader = new FileReader();
                       reader.onload = (event) => {
                         const text = event.target?.result as string;
                         if (text) {
-                          const lines = text.split('\n');
-                          const parsed: LyricLine[] = [];
-                          const timeRegEx = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
-                          
-                          lines.forEach(line => {
-                            const match = timeRegEx.exec(line);
-                            if (match) {
-                              const min = parseInt(match[1]);
-                              const sec = parseInt(match[2]);
-                              const ms = parseInt(match[3]);
-                              const time = min * 60 + sec + ms / (match[3].length === 2 ? 100 : 1000);
-                              const text = line.replace(timeRegEx, '').trim();
-                              if (text) {
-                                parsed.push({ time, text });
-                              }
-                            } else if (line.trim() && !line.startsWith('[')) {
-                              parsed.push({ time: -1, text: line.trim() });
-                            }
-                          });
-                          
-                          setParsedLyrics(parsed);
+                          // Manual lyric upload could update the track in DB
+                          console.log("Manual lyric upload not fully implemented in Player view yet");
                         }
                       };
                       reader.readAsText(file);

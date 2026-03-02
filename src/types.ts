@@ -1,3 +1,8 @@
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
 export interface Track {
   id: string;
   file: File;

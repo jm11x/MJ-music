@@ -66,8 +66,17 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
           }
 
           // Enhanced lyric extraction
-          if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
-            lyrics = metadata.common.lyrics.join('\n');
+          if (metadata.common.lyrics && Array.isArray(metadata.common.lyrics) && metadata.common.lyrics.length > 0) {
+            lyrics = metadata.common.lyrics.map(l => {
+              if (typeof l === 'string') return l;
+              if (typeof l === 'object' && l !== null) {
+                const val = l as any;
+                return val.text || val.description || JSON.stringify(val);
+              }
+              return String(l);
+            }).join('\n');
+          } else if (metadata.common.lyrics && typeof metadata.common.lyrics === 'string') {
+            lyrics = metadata.common.lyrics;
           } else {
             // Check native tags for lyrics if common.lyrics is empty
             const native = metadata.native;
@@ -78,17 +87,27 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
               // Look for any tag that might contain lyrics
               const lyricTag = tags.find(t => {
                 const id = String(t.id).toUpperCase();
-                return id === 'USLT' || 
-                       id === 'LYRICS' || 
-                       id === 'LYRIC' || 
+                return id.includes('LYRIC') || 
+                       id === 'USLT' || 
                        id === '©LYR' || 
                        id === 'UNSYNCHRONISEDLYRICS' ||
                        id === 'UNSYNCED LYRICS' ||
-                       id === 'TEXT';
+                       id === 'UNSYNCEDLYRICS' ||
+                       id === 'TEXT' ||
+                       id === 'TSLT'; // Sometimes used in some formats
               });
 
               if (lyricTag && lyricTag.value) {
-                if (typeof lyricTag.value === 'string') {
+                if (Array.isArray(lyricTag.value)) {
+                  lyrics = lyricTag.value.map(v => {
+                    if (typeof v === 'string') return v;
+                    if (typeof v === 'object' && v !== null) {
+                      const val = v as any;
+                      return val.text || val.description || JSON.stringify(val);
+                    }
+                    return String(v);
+                  }).join('\n');
+                } else if (typeof lyricTag.value === 'string') {
                   lyrics = lyricTag.value;
                 } else if (typeof lyricTag.value === 'object') {
                   // Some tags like USLT might be objects with { text: '...', language: '...' }

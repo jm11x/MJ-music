@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Track } from '../types';
+import { Track, LyricLine } from '../types';
 import { getAllTracks, saveTrack, deleteTrack, updateTrackInDB } from '../services/db';
 
 export function useAudioPlayer() {
@@ -10,6 +10,7 @@ export function useAudioPlayer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playHistory, setPlayHistory] = useState<{track: Track, timestamp: number}[]>([]);
+  const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -186,6 +187,48 @@ export function useAudioPlayer() {
     }
   }, [isPlaying, currentTime, duration]);
 
+  // Parse lyrics when track changes
+  useEffect(() => {
+    if (currentTrackIndex >= 0 && currentTrackIndex < tracks.length) {
+      const track = tracks[currentTrackIndex];
+      if (track.lyrics) {
+        const lines = track.lyrics.split('\n');
+        const result: LyricLine[] = [];
+        const timeRegex = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+
+        for (const line of lines) {
+          let match;
+          const timestamps: number[] = [];
+          let lastIndex = 0;
+          
+          // Reset regex lastIndex for each line
+          timeRegex.lastIndex = 0;
+          
+          while ((match = timeRegex.exec(line)) !== null) {
+            const minutes = parseInt(match[1]);
+            const seconds = parseFloat(match[2]);
+            timestamps.push(minutes * 60 + seconds);
+            lastIndex = timeRegex.lastIndex;
+          }
+          
+          const text = line.substring(lastIndex).trim();
+          if (timestamps.length > 0) {
+            timestamps.forEach(time => {
+              result.push({ time, text });
+            });
+          } else if (line.trim()) {
+            result.push({ time: -1, text: line.trim() });
+          }
+        }
+        setParsedLyrics(result.sort((a, b) => a.time - b.time));
+      } else {
+        setParsedLyrics([]);
+      }
+    } else {
+      setParsedLyrics([]);
+    }
+  }, [currentTrackIndex, tracks]);
+
   const lastRecordedTrackRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -348,6 +391,7 @@ export function useAudioPlayer() {
     queueTrackNext,
     moveTrackToEnd,
     shuffleTracks,
-    playHistory
+    playHistory,
+    parsedLyrics
   };
 }

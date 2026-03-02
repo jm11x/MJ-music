@@ -72,6 +72,7 @@ function AppContent() {
             onPrevious={player.playPrevious}
             onSeek={player.seek}
             onBack={() => setCurrentView('library')}
+            parsedLyrics={player.parsedLyrics}
           />
         );
       case 'stats':
