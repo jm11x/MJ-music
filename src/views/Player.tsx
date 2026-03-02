@@ -170,16 +170,19 @@ export const Player: React.FC<PlayerProps> = ({
           {parsedLyrics.length > 0 ? (
             parsedLyrics.map((line, index) => {
               const nextLine = parsedLyrics[index + 1];
-              const isActive = line.time !== -1 && currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
-              const isPast = line.time !== -1 && currentTime >= line.time;
+              const hasTimestamps = parsedLyrics.some(l => l.time !== -1);
+              const isActive = hasTimestamps 
+                ? (line.time !== -1 && currentTime >= line.time && (!nextLine || currentTime < nextLine.time))
+                : true; // If no timestamps, all are "active" (visible)
+              const isPast = hasTimestamps && line.time !== -1 && currentTime >= line.time;
               
               const dominantColor = track.dominantColors?.[0] || 'rgba(255,255,255,0.4)';
               
               return (
                 <p 
                   key={index} 
-                  className={`text-lg transition-all duration-500 will-change-transform ${isActive ? 'text-white font-bold scale-110' : isPast ? 'text-white/60' : 'text-white/30'}`}
-                  style={isActive ? { textShadow: `0 0 12px ${dominantColor}` } : {}}
+                  className={`text-lg transition-all duration-500 will-change-transform ${isActive ? 'text-white font-bold scale-110' : isPast ? 'text-white/60' : 'text-white/30'} ${!hasTimestamps ? 'opacity-100 scale-100 font-normal' : ''}`}
+                  style={isActive && hasTimestamps ? { textShadow: `0 0 12px ${dominantColor}` } : {}}
                 >
                   {line.text}
                 </p>

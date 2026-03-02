@@ -65,8 +65,39 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
             coverUrl = URL.createObjectURL(coverBlob);
           }
 
+          // Enhanced lyric extraction
           if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
             lyrics = metadata.common.lyrics.join('\n');
+          } else {
+            // Check native tags for lyrics if common.lyrics is empty
+            const native = metadata.native;
+            for (const type in native) {
+              const tags = native[type];
+              if (!Array.isArray(tags)) continue;
+              
+              // Look for any tag that might contain lyrics
+              const lyricTag = tags.find(t => {
+                const id = String(t.id).toUpperCase();
+                return id === 'USLT' || 
+                       id === 'LYRICS' || 
+                       id === 'LYRIC' || 
+                       id === '©LYR' || 
+                       id === 'UNSYNCHRONISEDLYRICS' ||
+                       id === 'UNSYNCED LYRICS' ||
+                       id === 'TEXT';
+              });
+
+              if (lyricTag && lyricTag.value) {
+                if (typeof lyricTag.value === 'string') {
+                  lyrics = lyricTag.value;
+                } else if (typeof lyricTag.value === 'object') {
+                  // Some tags like USLT might be objects with { text: '...', language: '...' }
+                  const val = lyricTag.value as any;
+                  lyrics = val.text || val.description || JSON.stringify(val);
+                }
+                if (lyrics) break;
+              }
+            }
           }
         } catch (err) {
           console.error("Error parsing metadata", err);
