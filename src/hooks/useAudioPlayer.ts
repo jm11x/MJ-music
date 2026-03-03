@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Track, LyricLine } from '../types';
-import { getAllTracks, saveTrack, deleteTrack, updateTrackInDB } from '../services/db';
+import { getAllTracks, saveTrack, deleteTrack, updateTrackInDB, savePlayHistory, getPlayHistory, updateTotalListeningTime, getTotalListeningTime } from '../services/db';
 
 export function useAudioPlayer() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -10,9 +10,13 @@ export function useAudioPlayer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playHistory, setPlayHistory] = useState<{track: Track, timestamp: number}[]>([]);
+  const [totalListeningTime, setTotalListeningTime] = useState(0);
   const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
+  const [analyzer, setAnalyzer] = useState<AnalyserNode | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   const togglePlayPause = useCallback(() => {
     if (currentTrackIndex !== -1) {
@@ -34,21 +38,18 @@ export function useAudioPlayer() {
     }
   }, [tracks.length]);
 
-  // Load tracks from DB on mount
+  // Load tracks and stats from DB on mount
   useEffect(() => {
-    const loadTracks = async () => {
+    const loadData = async () => {
       try {
         const savedTracks = await getAllTracks();
-        const tracksWithUrls = savedTracks.map(track => {
-          // Recreate object URLs for the file and the cover blob
-          // Stale blob URLs from previous sessions won't work
+        const tracksWithUrls: Track[] = savedTracks.map(track => {
           const url = URL.createObjectURL(track.file);
           let coverUrl = track.coverUrl;
           
           if (track.coverBlob) {
             coverUrl = URL.createObjectURL(track.coverBlob);
           } else if (coverUrl && coverUrl.startsWith('blob:')) {
-            // If it's a stale blob URL and we don't have the blob, it's broken
             coverUrl = undefined;
           }
           
@@ -59,17 +60,56 @@ export function useAudioPlayer() {
           };
         });
         setTracks(tracksWithUrls);
+
+        // Load History
+        const history = await getPlayHistory();
+        const mappedHistory = history
+          .map(h => {
+            const track = tracksWithUrls.find(t => t.id === h.trackId);
+            return track ? { track, timestamp: h.timestamp } : null;
+          })
+          .filter((h): h is { track: Track; timestamp: number } => h !== null);
+        setPlayHistory(mappedHistory);
+
+        // Load Total Time
+        const totalTime = await getTotalListeningTime();
+        setTotalListeningTime(totalTime);
+
       } catch (err) {
-        console.error("Failed to load tracks from DB", err);
+        console.error("Failed to load data from DB", err);
       }
     };
-    loadTracks();
+    loadData();
   }, []);
 
   useEffect(() => {
     audioRef.current = new Audio();
-    
     const audio = audioRef.current;
+
+    const initAudioContext = () => {
+      if (!audioContextRef.current) {
+        const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+        const ctx = new AudioContextClass();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        
+        const source = ctx.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        
+        audioContextRef.current = ctx;
+        sourceRef.current = source;
+        setAnalyzer(analyser);
+      } else if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+    };
+
+    const handlePlay = () => {
+      initAudioContext();
+    };
+
+    audio.addEventListener('play', handlePlay);
     
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
@@ -192,35 +232,126 @@ export function useAudioPlayer() {
     if (currentTrackIndex >= 0 && currentTrackIndex < tracks.length) {
       const track = tracks[currentTrackIndex];
       if (track.lyrics) {
-        const lines = track.lyrics.split('\n');
+        const lines = track.lyrics.split(/\r?\n/);
         const result: LyricLine[] = [];
-        const timeRegex = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+        
+        // Improved regex to handle:
+        // [mm:ss.xx]
+        // [mm:ss:xx]
+        // [mm:ss]
+        // [h:mm:ss.xx]
+        // Multiple tags: [mm:ss.xx][mm:ss.yy]
+        const timeRegex = /\[(\d+:)?(\d+):(\d+)([.:](\d+))?\]/g;
 
         for (const line of lines) {
-          let match;
           const timestamps: number[] = [];
-          let lastIndex = 0;
+          let match;
           
           // Reset regex lastIndex for each line
           timeRegex.lastIndex = 0;
           
           while ((match = timeRegex.exec(line)) !== null) {
-            const minutes = parseInt(match[1]);
-            const seconds = parseFloat(match[2]);
-            timestamps.push(minutes * 60 + seconds);
-            lastIndex = timeRegex.lastIndex;
+            // match[1] is hours (optional, includes colon)
+            // match[2] is minutes
+            // match[3] is seconds
+            // match[5] is milliseconds/hundredths (optional)
+            
+            const hours = match[1] ? parseInt(match[1].replace(':', ''), 10) : 0;
+            const minutes = parseInt(match[2], 10);
+            const seconds = parseInt(match[3], 10);
+            const fractional = match[5] ? parseInt(match[5], 10) : 0;
+            
+            let time = hours * 3600 + minutes * 60 + seconds;
+            
+            if (match[5]) {
+              // Adjust fractional part based on its length
+              const len = match[5].length;
+              time += fractional / Math.pow(10, len);
+            }
+            
+            timestamps.push(time);
           }
           
-          const text = line.substring(lastIndex).trim();
+          // Extract text by removing all [time] tags and metadata tags like [ar:...]
+          const text = line.replace(/\[(\d+:)?\d+:\d+([.:]\d+)?\]/g, '')
+                           .replace(/\[[a-z]+:.*\]/gi, '')
+                           .trim();
+          
           if (timestamps.length > 0) {
             timestamps.forEach(time => {
+              // We keep the line even if text is empty if it has a timestamp (could be an instrumental break)
               result.push({ time, text });
             });
-          } else if (line.trim()) {
+          } else if (line.trim() && !line.match(/^\[[a-z]+:.*\]/i)) {
+            // Static line without timestamp, and not a metadata tag
             result.push({ time: -1, text: line.trim() });
           }
         }
-        setParsedLyrics(result.sort((a, b) => a.time - b.time));
+        
+        // Sort by time and filter out any remaining metadata or empty artifacts
+        let sorted = result
+          .filter(l => l.text !== undefined)
+          .sort((a, b) => a.time - b.time);
+          
+        // If we have static lyrics (no timestamps), estimate them
+        const hasTimestamps = sorted.some(l => l.time !== -1);
+        if (!hasTimestamps && sorted.length > 0 && duration > 0) {
+          const lineDuration = duration / sorted.length;
+          sorted = sorted.map((l, i) => ({
+            ...l,
+            time: i * lineDuration
+          }));
+        } else if (hasTimestamps) {
+          // If some lines have timestamps and some don't, we might want to interpolate
+          // For now, we'll just keep them as -1 or filter them if they are at the start
+          // but a better approach is to assign them a time between the previous and next timed line
+          let lastTimedIndex = -1;
+          for (let i = 0; i < sorted.length; i++) {
+            if (sorted[i].time !== -1) {
+              if (lastTimedIndex !== -1 && i - lastTimedIndex > 1) {
+                // Interpolate between lastTimedIndex and i
+                const startTime = sorted[lastTimedIndex].time;
+                const endTime = sorted[i].time;
+                const gap = i - lastTimedIndex;
+                const step = (endTime - startTime) / gap;
+                for (let j = 1; j < gap; j++) {
+                  sorted[lastTimedIndex + j].time = startTime + (step * j);
+                }
+              }
+              lastTimedIndex = i;
+            }
+          }
+          
+          // Handle lines before the first timestamp
+          const firstTimedIndex = sorted.findIndex(l => l.time !== -1);
+          if (firstTimedIndex > 0) {
+            const firstTime = sorted[firstTimedIndex].time;
+            const step = firstTime / (firstTimedIndex + 1);
+            for (let i = 0; i < firstTimedIndex; i++) {
+              sorted[i].time = step * (i + 1);
+            }
+          }
+          
+          // Handle lines after the last timestamp
+          let lastTimedIdx = -1;
+          for (let i = sorted.length - 1; i >= 0; i--) {
+            if (sorted[i].time !== -1) {
+              lastTimedIdx = i;
+              break;
+            }
+          }
+          if (lastTimedIdx !== -1 && lastTimedIdx < sorted.length - 1) {
+            const lastTime = sorted[lastTimedIdx].time;
+            const remainingTime = duration - lastTime;
+            const gap = sorted.length - 1 - lastTimedIdx;
+            const step = remainingTime / (gap + 1);
+            for (let i = 1; i <= gap; i++) {
+              sorted[lastTimedIdx + i].time = lastTime + (step * i);
+            }
+          }
+        }
+
+        setParsedLyrics(sorted);
       } else {
         setParsedLyrics([]);
       }
@@ -230,6 +361,19 @@ export function useAudioPlayer() {
   }, [currentTrackIndex, tracks]);
 
   const lastRecordedTrackRef = useRef<string | null>(null);
+  const lastTimeRef = useRef<number>(0);
+
+  // Track listening time
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setTotalListeningTime(prev => prev + 1);
+      updateTotalListeningTime(1).catch(console.error);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
   useEffect(() => {
     if (currentTrackIndex >= 0 && currentTrackIndex < tracks.length && audioRef.current) {
@@ -239,7 +383,9 @@ export function useAudioPlayer() {
       if (isPlaying) {
         audioRef.current.play().catch(console.error);
         if (lastRecordedTrackRef.current !== track.id) {
-          setPlayHistory(prev => [...prev, { track, timestamp: Date.now() }]);
+          const timestamp = Date.now();
+          setPlayHistory(prev => [...prev, { track, timestamp }]);
+          savePlayHistory(track.id, timestamp).catch(console.error);
           lastRecordedTrackRef.current = track.id;
         }
       }
@@ -253,7 +399,9 @@ export function useAudioPlayer() {
         if (currentTrackIndex >= 0 && currentTrackIndex < tracks.length) {
           const track = tracks[currentTrackIndex];
           if (lastRecordedTrackRef.current !== track.id) {
-            setPlayHistory(prev => [...prev, { track, timestamp: Date.now() }]);
+            const timestamp = Date.now();
+            setPlayHistory(prev => [...prev, { track, timestamp }]);
+            savePlayHistory(track.id, timestamp).catch(console.error);
             lastRecordedTrackRef.current = track.id;
           }
         }
@@ -285,6 +433,15 @@ export function useAudioPlayer() {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
       setProgress(percentage);
+    }
+  };
+
+  const seekToTime = (time: number) => {
+    if (audioRef.current && duration) {
+      const safeTime = Math.max(0, Math.min(time, duration));
+      audioRef.current.currentTime = safeTime;
+      setCurrentTime(safeTime);
+      setProgress((safeTime / duration) * 100);
     }
   };
 
@@ -386,12 +543,15 @@ export function useAudioPlayer() {
     playNext,
     playPrevious,
     seek,
+    seekToTime,
     removeTrack,
     updateTrack,
     queueTrackNext,
     moveTrackToEnd,
     shuffleTracks,
     playHistory,
-    parsedLyrics
+    totalListeningTime,
+    parsedLyrics,
+    analyzer
   };
 }

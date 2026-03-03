@@ -43,7 +43,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progre
   return (
     <div className="absolute bottom-24 left-4 right-4 z-40">
       <div 
-        className={`glass-panel rounded-2xl p-3 flex items-center space-x-3 cursor-pointer relative overflow-hidden group ${settings.edgeDistortionEnabled ? 'edge-distortion' : ''}`}
+        className={`${settings.solidBlackUI ? 'bg-black border border-white/10' : 'glass-panel backdrop-blur-xl'} rounded-2xl p-3 flex items-center space-x-3 cursor-pointer relative overflow-hidden group ${settings.edgeDistortionEnabled ? 'edge-distortion' : ''}`}
         onClick={onClick}
       >
         {/* Progress Background */}
@@ -67,7 +67,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progre
         
         <div className="flex items-center space-x-1 sm:space-x-2">
           <motion.button 
-            {...buttonPhysics}
+            whileTap={{ x: 10, scale: 0.9 }}
             onClick={(e) => { e.stopPropagation(); handleHaptic(); onPrevious(); }}
             className="p-1.5 sm:p-2 text-white/70 hover:text-white transition-colors"
           >
@@ -75,18 +75,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progre
           </motion.button>
           
           <motion.button 
-            {...buttonPhysics}
+            whileTap={{ scale: 1.2 }}
             onClick={(e) => { e.stopPropagation(); handleHaptic(); onTogglePlay(); }}
-            className={`w-10 h-10 ${getButtonShapeClass()} glass-button flex items-center justify-center flex-shrink-0`}
+            className={`w-10 h-10 ${getButtonShapeClass()} ${settings.solidBlackUI ? 'bg-white/10' : 'glass-button'} flex items-center justify-center flex-shrink-0`}
             style={{
               boxShadow: settings.beatReactiveGlow && isPlaying ? `0 0 ${settings.beatGlowIntensity / 2}px rgba(255,255,255,0.4)` : undefined
             }}
           >
             {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
           </motion.button>
-
           <motion.button 
-            {...buttonPhysics}
+            whileTap={{ x: -10, scale: 0.9 }}
             onClick={(e) => { e.stopPropagation(); handleHaptic(); onNext(); }}
             className="p-1.5 sm:p-2 text-white/70 hover:text-white transition-colors"
           >

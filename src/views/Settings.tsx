@@ -66,9 +66,10 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
   const { settings, updateSetting } = useSettings();
   const [expandedSection, setExpandedSection] = useState<string | null>('Appearance');
 
-  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWallpaperChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const url = URL.createObjectURL(e.target.files[0]);
+      const file = e.target.files[0];
+      const url = URL.createObjectURL(file);
       if (onVideoWallpaperChange) onVideoWallpaperChange(url);
     }
   };
@@ -78,7 +79,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
   };
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-y-auto pb-32">
+    <div className={`h-full flex flex-col p-6 overflow-y-auto pb-32 ${settings.solidBlackUI ? 'bg-black' : ''}`}>
       <div className="flex items-center space-x-4 mb-8">
         <button onClick={onBack} className="p-2 -ml-2 text-white/70 hover:text-white transition-colors">
           <ArrowLeft size={24} />
@@ -88,7 +89,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
       
       <div className="space-y-6">
         {/* Appearance */}
-        <section className="glass-panel rounded-2xl p-4">
+        <section className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} rounded-2xl p-4`}>
           <SectionHeader title="Appearance" expandedSection={expandedSection} toggleSection={toggleSection} />
           {expandedSection === 'Appearance' && (
             <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
@@ -120,18 +121,21 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
                 onChange={(v: any) => updateSetting('albumStyle', v)}
               />
               <Slider label="Corner Radius" value={settings.albumCornerRadius} min={0} max={100} unit="px" onChange={(v: number) => updateSetting('albumCornerRadius', v)} />
+              <Slider label="Album Depth" value={settings.albumDepth} min={0} max={100} unit="%" onChange={(v: number) => updateSetting('albumDepth', v)} />
+              
+              <Toggle label="Solid Black UI" checked={settings.solidBlackUI} onChange={(v: boolean) => updateSetting('solidBlackUI', v)} />
               
               <div className="h-px bg-white/10 w-full my-4" />
               
               <div className="flex justify-between items-center py-3">
                 <div className="flex items-center space-x-3">
                   <Video size={20} className="text-white/70" />
-                  <span className="text-sm">Video Wallpaper</span>
+                  <span className="text-sm">App Wallpaper</span>
                 </div>
                 <div className="flex space-x-2">
                   <label className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full cursor-pointer transition-colors">
                     Select
-                    <input type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+                    <input type="file" accept="video/*,image/*" className="hidden" onChange={handleWallpaperChange} />
                   </label>
                   <button onClick={() => onVideoWallpaperChange && onVideoWallpaperChange(undefined)} className="text-xs bg-red-500/20 hover:bg-red-500/40 text-red-200 px-3 py-1.5 rounded-full transition-colors">
                     Clear
@@ -143,7 +147,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
         </section>
 
         {/* Controls */}
-        <section className="glass-panel rounded-2xl p-4">
+        <section className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} rounded-2xl p-4`}>
           <SectionHeader title="Controls" expandedSection={expandedSection} toggleSection={toggleSection} />
           {expandedSection === 'Controls' && (
             <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
@@ -171,7 +175,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
         </section>
 
         {/* Visual Effects */}
-        <section className="glass-panel rounded-2xl p-4">
+        <section className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} rounded-2xl p-4`}>
           <SectionHeader title="Visual Effects" expandedSection={expandedSection} toggleSection={toggleSection} />
           {expandedSection === 'Visual Effects' && (
             <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
@@ -189,7 +193,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
                   <Select 
                     label="Visualizer Mode" 
                     value={settings.visualizerMode} 
-                    options={[{label: 'Bars', value: 'bars'}, {label: 'Waveform', value: 'waveform'}, {label: 'Ambient', value: 'ambient'}]}
+                    options={[{label: 'Bars', value: 'bars'}, {label: 'Gradient', value: 'gradient'}, {label: 'Ambient', value: 'ambient'}]}
                     onChange={(v: any) => updateSetting('visualizerMode', v)}
                   />
                   <Slider label="Opacity" value={settings.visualizerOpacity} min={0} max={100} unit="%" onChange={(v: number) => updateSetting('visualizerOpacity', v)} />
@@ -206,7 +210,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onVideoWallpaperChan
         </section>
 
         {/* Performance */}
-        <section className="glass-panel rounded-2xl p-4">
+        <section className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} rounded-2xl p-4`}>
           <SectionHeader title="Performance" expandedSection={expandedSection} toggleSection={toggleSection} />
           {expandedSection === 'Performance' && (
             <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">

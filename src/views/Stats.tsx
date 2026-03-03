@@ -30,7 +30,7 @@ const topSongs = [
   { id: 5, title: 'Midnight City', artist: 'M83', plays: 24, image: 'https://picsum.photos/seed/midnight/100/100' },
 ];
 
-export const Stats = ({ onOpenSettings, playHistory = [] }: { onOpenSettings?: () => void, playHistory?: {track: Track, timestamp: number}[] }) => {
+export const Stats = ({ onOpenSettings, playHistory = [], totalListeningTime = 0 }: { onOpenSettings?: () => void, playHistory?: {track: Track, timestamp: number}[], totalListeningTime?: number }) => {
   const { settings } = useSettings();
   const [period, setPeriod] = React.useState('Today');
   const [isMounted, setIsMounted] = React.useState(false);
@@ -60,11 +60,7 @@ export const Stats = ({ onOpenSettings, playHistory = [] }: { onOpenSettings?: (
   };
 
   // Calculate real stats
-  const totalSeconds = playHistory.reduce((acc, curr) => acc + 180, 0); // Assuming 3 mins per play for mock if duration not available, but let's try to get real duration if possible.
-  // Actually, let's just count plays for now as "time" is hard to track without a timer.
-  // But I can use the track duration if I had it. Track doesn't have duration in the interface.
-  // Wait, Player.tsx has duration. useAudioPlayer has duration.
-  // Let's assume 3.5 minutes per song for the stats if we don't have it.
+  const totalSeconds = totalListeningTime;
   
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMins = Math.floor((totalSeconds % 3600) / 60);
@@ -134,7 +130,7 @@ export const Stats = ({ onOpenSettings, playHistory = [] }: { onOpenSettings?: (
   return (
     <div className="h-full flex flex-col p-6 overflow-y-auto pb-32">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Listening Stats</h1>
+        <h1 className="text-3xl font-black tracking-tighter font-montserrat uppercase">Listening Stats</h1>
         <button onClick={onOpenSettings} className="p-2 text-white/70 hover:text-white transition-colors">
           <Settings size={24} />
         </button>
@@ -142,10 +138,10 @@ export const Stats = ({ onOpenSettings, playHistory = [] }: { onOpenSettings?: (
 
 
       {/* Chart Card */}
-      <div className="glass-panel rounded-3xl p-6 mb-8 relative overflow-hidden">
+      <div className={`glass-panel rounded-3xl p-8 mb-8 relative overflow-hidden ${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : ''}`}>
         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-        <h3 className="text-white/70 text-sm font-medium mb-1">Total Listening Time</h3>
-        <p className="text-2xl font-bold mb-6">{totalHours}h {totalMins}m</p>
+        <h3 className="text-white/70 text-base font-medium mb-2">Total Listening Time</h3>
+        <p className="text-4xl font-bold mb-8 tracking-tight">{totalHours}h {totalMins}m</p>
         
         <div className="h-48 w-full relative min-h-[192px] overflow-hidden">
           {isMounted && (

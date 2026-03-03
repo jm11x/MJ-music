@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Track } from '../types';
-import { Upload, Music, MoreVertical, Play, ListPlus, ListMusic, Heart, Info, Share2, Pen, Image as ImageIcon, Trash2, FolderOpen, Settings, Shuffle } from 'lucide-react';
+import { Search, Plus, Play, MoreVertical, Trash2, Music, FolderPlus, Shuffle, Settings, ChevronRight, Upload, FileAudio, FolderOpen, ListPlus, ListMusic, Heart, Info, Share2, Pen, Image as ImageIcon } from 'lucide-react';
 import * as mm from 'music-metadata';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -19,10 +19,18 @@ interface LibraryProps {
 
 export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTrack, currentTrackId, onRemoveTrack, onUpdateTrack, onQueueNext, onMoveToEnd, onShuffle, onOpenSettings }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const [detailsTrack, setDetailsTrack] = useState<Track | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const { settings } = useSettings();
+
+  const filteredTracks = tracks.filter(track => 
+    track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    track.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    track.album.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getButtonShapeClass = () => {
     switch (settings.buttonShape) {
@@ -85,16 +93,22 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
               if (!Array.isArray(tags)) continue;
               
               // Look for any tag that might contain lyrics
+              // FLAC/Vorbis uses 'LYRICS', ID3 uses 'USLT', 'SYLT', etc.
               const lyricTag = tags.find(t => {
                 const id = String(t.id).toUpperCase();
                 return id.includes('LYRIC') || 
                        id === 'USLT' || 
+                       id === 'SYLT' ||
                        id === '©LYR' || 
                        id === 'UNSYNCHRONISEDLYRICS' ||
                        id === 'UNSYNCED LYRICS' ||
                        id === 'UNSYNCEDLYRICS' ||
                        id === 'TEXT' ||
-                       id === 'TSLT'; // Sometimes used in some formats
+                       id === 'TSLT' ||
+                       id === 'LYRICS' ||
+                       id === 'SLT' ||
+                       id === 'ULT' ||
+                       id === 'LYR';
               });
 
               if (lyricTag && lyricTag.value) {
@@ -110,7 +124,6 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
                 } else if (typeof lyricTag.value === 'string') {
                   lyrics = lyricTag.value;
                 } else if (typeof lyricTag.value === 'object') {
-                  // Some tags like USLT might be objects with { text: '...', language: '...' }
                   const val = lyricTag.value as any;
                   lyrics = val.text || val.description || JSON.stringify(val);
                 }
@@ -163,7 +176,7 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
   const activeTrack = tracks.find(t => t.id === activeMenuId);
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-y-auto pb-32 relative">
+    <div className={`h-full flex flex-col p-6 overflow-y-auto pb-32 relative ${settings.solidBlackUI ? 'bg-black' : ''}`}>
       {/* Toast */}
       {toast && (
         <div className="fixed top-10 left-1/2 transform -translate-x-1/2 z-[70] bg-cyan-500 text-black px-6 py-3 rounded-full font-medium shadow-lg animate-in fade-in slide-in-from-top-4">
@@ -171,37 +184,89 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Library</h1>
-        <div className="flex space-x-2">
-          <button onClick={() => { onShuffle(); showToast('Library shuffled'); }} className={`glass-button p-3 ${getButtonShapeClass()} flex items-center justify-center`} title="Shuffle Library">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-black tracking-tighter font-montserrat uppercase">Library</h1>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => { onShuffle(); showToast('Library shuffled'); }} 
+            className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-button'} p-3 ${getButtonShapeClass()} flex items-center justify-center aspect-square transition-all active:scale-90`} 
+            title="Shuffle Library"
+          >
             <Shuffle size={20} />
           </button>
-          <label className={`glass-button p-3 ${getButtonShapeClass()} cursor-pointer flex items-center justify-center`} title="Add Folder">
-            <FolderOpen size={20} />
-            <input 
-              type="file" 
-              accept="audio/*,.lrc" 
-              multiple 
-              webkitdirectory=""
-              className="hidden" 
-              onChange={handleFileChange}
-            />
-          </label>
-          <label className={`glass-button p-3 ${getButtonShapeClass()} cursor-pointer flex items-center justify-center`} title="Add Files">
-            <Upload size={20} />
-            <input 
-              type="file" 
-              accept=".flac,.mp3,.wav,.aac,.ogg,.m4a,audio/*,.lrc" 
-              multiple 
-              className="hidden" 
-              onChange={handleFileChange}
-            />
-          </label>
-          <button onClick={onOpenSettings} className={`glass-button p-3 ${getButtonShapeClass()} flex items-center justify-center`} title="Settings">
+          
+          <div className="relative">
+            <button 
+              onClick={() => setShowUploadOptions(!showUploadOptions)}
+              className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-button'} p-3 ${getButtonShapeClass()} flex items-center justify-center aspect-square transition-all active:scale-90 ${showUploadOptions ? 'ring-2 ring-cyan-500/50 bg-white/10' : ''}`}
+              title="Upload"
+            >
+              <Upload size={20} />
+            </button>
+
+            {showUploadOptions && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowUploadOptions(false)} />
+                <div className={`absolute right-0 mt-3 w-56 rounded-[24px] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/10 ${settings.solidBlackUI ? 'bg-zinc-900' : 'glass-panel backdrop-blur-2xl'}`}>
+                  <div className="p-1.5">
+                    <label className="flex items-center space-x-3 px-4 py-3.5 hover:bg-white/10 cursor-pointer transition-colors rounded-xl group">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Music size={18} className="text-cyan-400" />
+                      </div>
+                      <span className="text-sm font-semibold tracking-tight">Add Files</span>
+                      <input type="file" multiple accept="audio/*,.lrc" className="hidden" onChange={(e) => { handleFileChange(e); setShowUploadOptions(false); }} />
+                    </label>
+                    <label className="flex items-center space-x-3 px-4 py-3.5 hover:bg-white/10 cursor-pointer transition-colors rounded-xl group">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FolderOpen size={18} className="text-purple-400" />
+                      </div>
+                      <span className="text-sm font-semibold tracking-tight">Add Folder</span>
+                      <input 
+                        type="file" 
+                        // @ts-ignore
+                        webkitdirectory="" 
+                        directory="" 
+                        multiple 
+                        className="hidden" 
+                        onChange={(e) => { handleFileChange(e); setShowUploadOptions(false); }} 
+                      />
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button 
+            onClick={onOpenSettings} 
+            className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-button'} p-3 ${getButtonShapeClass()} flex items-center justify-center aspect-square transition-all active:scale-90`} 
+            title="Settings"
+          >
             <Settings size={20} />
           </button>
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-8">
+        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+          <Search size={18} className="text-white/30" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search tracks, artists, or albums..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className={`w-full ${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} py-4 pl-12 pr-4 rounded-2xl text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all`}
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="absolute inset-y-0 right-4 flex items-center text-white/30 hover:text-white"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
 
       {tracks.length === 0 ? (
@@ -212,14 +277,27 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
           <p className="text-lg">No audio files loaded</p>
           <p className="text-sm text-center max-w-xs">Tap the upload icon to add FLAC or MP3 files to your library.</p>
         </div>
+      ) : filteredTracks.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-white/50 space-y-4 py-12">
+          <Search size={40} className="text-white/20" />
+          <p className="text-lg">No matches found for "{searchQuery}"</p>
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="text-cyan-400 hover:underline"
+          >
+            Clear search
+          </button>
+        </div>
       ) : (
         <div className="space-y-4">
-          {tracks.map((track, index) => (
-            <div 
-              key={track.id}
-              onClick={() => onPlayTrack(index)}
-              className={`glass-panel p-4 rounded-2xl flex items-center space-x-4 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] ${currentTrackId === track.id ? 'border-cyan-400/50 bg-white/20' : ''}`}
-            >
+          {filteredTracks.map((track, index) => {
+            const originalIndex = tracks.findIndex(t => t.id === track.id);
+            return (
+              <div 
+                key={track.id}
+                onClick={() => onPlayTrack(originalIndex)}
+                className={`${settings.solidBlackUI ? 'bg-white/5 border border-white/10' : 'glass-panel'} p-4 rounded-2xl flex items-center space-x-4 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] ${currentTrackId === track.id ? 'border-cyan-400/50 bg-white/20' : ''}`}
+              >
               <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
                 {track.coverUrl ? (
                   <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
@@ -243,9 +321,10 @@ export const Library: React.FC<LibraryProps> = ({ tracks, onAddTracks, onPlayTra
                 <MoreVertical size={20} />
               </button>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+    )}
 
       {/* Menu Modal */}
       {activeMenuId && activeTrack && (

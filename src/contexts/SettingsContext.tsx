@@ -39,7 +39,7 @@ export interface AppSettings {
   
   // Visual Effects
   visualizerEnabled: boolean;
-  visualizerMode: 'bars' | 'waveform' | 'ambient';
+  visualizerMode: 'bars' | 'gradient' | 'ambient';
   visualizerOpacity: number;
   visualizerSensitivity: number;
   edgeDistortionEnabled: boolean;
@@ -49,6 +49,7 @@ export interface AppSettings {
   disableDynamicLighting: boolean;
   lowerBlurQuality: boolean;
   batterySaver: boolean;
+  solidBlackUI: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -89,6 +90,7 @@ const defaultSettings: AppSettings = {
   disableDynamicLighting: false,
   lowerBlurQuality: false,
   batterySaver: false,
+  solidBlackUI: false,
 };
 
 interface SettingsContextType {

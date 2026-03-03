@@ -13,6 +13,30 @@ import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState<ViewState>('library');
+  
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.view) {
+        setCurrentView(event.state.view);
+      } else {
+        setCurrentView('library');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    // Initial state
+    window.history.replaceState({ view: 'library' }, '');
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const changeView = (view: ViewState) => {
+    if (view !== currentView) {
+      window.history.pushState({ view }, '');
+      setCurrentView(view);
+    }
+  };
   const [videoWallpaperUrl, setVideoWallpaperUrl] = useState<string | undefined>();
   const player = useAudioPlayer();
   const { settings } = useSettings();
@@ -48,7 +72,7 @@ function AppContent() {
             onAddTracks={player.addTracks} 
             onPlayTrack={(index) => {
               player.playTrack(index);
-              setCurrentView('player');
+              changeView('player');
             }}
             currentTrackId={player.currentTrack?.id}
             onRemoveTrack={player.removeTrack}
@@ -56,7 +80,7 @@ function AppContent() {
             onQueueNext={player.queueTrackNext}
             onMoveToEnd={player.moveTrackToEnd}
             onShuffle={player.shuffleTracks}
-            onOpenSettings={() => setCurrentView('settings')}
+            onOpenSettings={() => changeView('settings')}
           />
         );
       case 'player':
@@ -71,32 +95,33 @@ function AppContent() {
             onNext={player.playNext}
             onPrevious={player.playPrevious}
             onSeek={player.seek}
-            onBack={() => setCurrentView('library')}
+            onSeekToTime={player.seekToTime}
+            onBack={() => changeView('library')}
             parsedLyrics={player.parsedLyrics}
           />
         );
       case 'stats':
-        return <Stats playHistory={player.playHistory} onOpenSettings={() => setCurrentView('settings')} />;
+        return <Stats playHistory={player.playHistory} totalListeningTime={player.totalListeningTime} onOpenSettings={() => changeView('settings')} />;
       case 'settings':
-        return <Settings onBack={() => setCurrentView('stats')} onVideoWallpaperChange={setVideoWallpaperUrl} />;
+        return <Settings onBack={() => window.history.back()} onVideoWallpaperChange={setVideoWallpaperUrl} />;
       default:
         return null;
     }
   };
 
   return (
-    <div className={`relative w-full h-screen overflow-hidden text-white font-sans selection:bg-cyan-500/30 ${settings.dynamicLighting ? 'dynamic-light-container' : ''}`}>
-      <Background coverUrl={player.currentTrack?.coverUrl} videoUrl={videoWallpaperUrl} isPlaying={player.isPlaying} />
+    <div className={`relative w-full h-screen overflow-hidden text-white font-sans selection:bg-cyan-500/30 ${settings.dynamicLighting ? 'dynamic-light-container' : ''} ${settings.solidBlackUI ? 'bg-black' : ''}`}>
+      <Background coverUrl={player.currentTrack?.coverUrl} videoUrl={videoWallpaperUrl} isPlaying={player.isPlaying} analyzer={player.analyzer} />
       
       {/* Main Content Area */}
-      <div className={`relative z-10 w-full h-full max-w-md mx-auto bg-transparent backdrop-blur-[2px] shadow-2xl overflow-hidden flex flex-col sm:border-x sm:border-white/10 ${settings.edgeDistortionEnabled ? 'edge-distortion' : ''}`}>
+      <div className={`relative z-10 w-full h-full max-w-md mx-auto bg-transparent backdrop-blur-[2px] shadow-2xl overflow-hidden flex flex-col sm:border-x sm:border-white/10 ${settings.edgeDistortionEnabled ? 'edge-distortion' : ''} ${settings.solidBlackUI ? '!backdrop-blur-0 !shadow-none !border-white/5' : ''}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
             className="flex-1 h-full"
           >
             {renderView()}
@@ -109,6 +134,7 @@ function AppContent() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
+            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
           >
             <MiniPlayer 
               track={player.currentTrack}
@@ -117,13 +143,13 @@ function AppContent() {
               onTogglePlay={player.togglePlayPause}
               onNext={player.playNext}
               onPrevious={player.playPrevious}
-              onClick={() => setCurrentView('player')}
+              onClick={() => changeView('player')}
             />
           </motion.div>
         )}
 
         {currentView !== 'player' && (
-          <BottomNav currentView={currentView} onChangeView={setCurrentView} />
+          <BottomNav currentView={currentView} onChangeView={changeView} />
         )}
       </div>
     </div>

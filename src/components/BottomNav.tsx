@@ -23,7 +23,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onChangeView 
 
   return (
     <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-      <div className={`glass-panel ${getContainerShapeClass()} px-8 py-3 flex items-center space-x-12`}>
+      <div className={`${settings.solidBlackUI ? 'bg-black border border-white/10' : 'glass-panel backdrop-blur-xl'} ${getContainerShapeClass()} px-8 py-3 flex items-center space-x-12`}>
         <button 
           onClick={() => onChangeView('library')}
           className={`flex flex-col items-center space-y-1 transition-colors ${currentView === 'library' ? 'text-cyan-400' : 'text-white/50 hover:text-white/80'}`}
